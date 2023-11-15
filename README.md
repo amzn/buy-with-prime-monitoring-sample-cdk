@@ -2,7 +2,7 @@
 
 Welcome to the Buy with Prime Metrics and Logging Standardization repository! In today's rapidly evolving microservices landscape, monitoring and observability are critical for maintaining the health and performance of your applications. It is even challenging when you are managing multiple microservices over different AWS accounts for multiple tenants. This repository serves as a guide and reference for implementing best practices in standardizing metrics, logs, and dashboards across multiple microservices using AWS Cloud Development Kit (CDK) with the sampled use cases of Buy with Prime.
 
-Disclaimer: This repository is meant to be a sample implementation of the CDK Constructs discussed in re:Invent 2023 BWP301 - *SaaS Operations in Action - Buy with Prime*. Please check out [Path to Production](## Path to Production) section of this README.
+Disclaimer: This repository is meant to be a sample implementation of the CDK Constructs discussed in re:Invent 2023 BWP301 - *SaaS Operations in Action - Buy with Prime*. Please check out [Path to Production](#path-to-production) section of this README.
 
 This repository offers an simplified sample of reusuable CDK Constructs. Please note that we follow opinionated practices, but this is not a production package.
 
