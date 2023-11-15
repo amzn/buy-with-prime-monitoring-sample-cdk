@@ -1,0 +1,133 @@
+import { FargateService } from 'aws-cdk-lib/aws-ecs';
+import {
+    DEFAULT_METRIC_PERIOD, Metric, MetricOptions, MetricStatistic,
+} from '../../common/metrics';
+import { MetricFactory } from '../metric-factory';
+import { ResourceMetricProps } from '../resource-metric';
+
+const EcsContainerInsightsNamespace = 'ECS/ContainerInsights';
+const COLOR_NOT_SPECIFIED = undefined;
+/**
+ * Network Load Balanced Fargate Service Metric Factory Props.
+ * Defines the metrics for the resource against which monitoring can be done.
+ *
+ */
+export interface FargateServiceMetricFactoryProps extends ResourceMetricProps {
+    /**
+     * Fargate service instance. Must pass this or fargateServiceCore.
+     */
+    readonly fargateServiceCore: FargateService;
+
+    /**
+     * Metric Options for the Cpu Maximum utilization
+     *
+     *  Refer: https://docs.aws.amazon.com/cdk/api/latest/docs/@aws-cdk_aws-ecs.FargateService.html#metricwbrcpuwbrutilizationprops
+     */
+    readonly cpuUtilizationPercentMetricOptions?: MetricOptions;
+
+    /**
+     * Metric Options for the Memory Maximum utilization.
+     *
+     * Refer : https://docs.aws.amazon.com/cdk/api/latest/docs/@aws-cdk_aws-ecs.FargateService.html#metricwbrmemorywbrutilizationprops
+     */
+    readonly memoryUtilizationPercentMetricOptions?: MetricOptions;
+    /**
+     * Metric Options for the Healthy Hosts Count.
+     */
+    readonly healthyHostsMetricOptions?: MetricOptions;
+    /**
+     * Metric Options for Disk Utilization provided by ContainerInsights
+     */
+    readonly diskUtilizationMetricOptions?: MetricOptions;
+    /**
+     * The metric statistic for the running tasks on which metric has to be formed.
+     */
+    readonly runningTasksMetricStatistic ?: MetricStatistic;
+}
+
+export class FargateServiceMetricFactory {
+    private readonly props: FargateServiceMetricFactoryProps;
+
+    protected readonly metricFactory: MetricFactory;
+
+    private readonly fargateServiceCore: FargateService;
+
+    constructor(metricFactory: MetricFactory, props: FargateServiceMetricFactoryProps) {
+        this.props = props;
+        this.metricFactory = metricFactory;
+        this.fargateServiceCore = props.fargateServiceCore;
+    }
+
+    metricClusterCpuUtilizationInPercent() : Metric {
+        return this.fargateServiceCore.metricCpuUtilization({
+            label: 'Cluster CPU Utilization',
+            period: this.props.cpuUtilizationPercentMetricOptions?.period ?? DEFAULT_METRIC_PERIOD,
+        });
+    }
+
+    metricClusterMemoryUtilizationInPercent(): Metric {
+        return this.fargateServiceCore.metricMemoryUtilization({
+            label: 'Cluster Memory Utilization',
+            period: this.props.memoryUtilizationPercentMetricOptions?.period ?? DEFAULT_METRIC_PERIOD,
+        });
+    }
+
+    metricRunningTaskCount(): Metric {
+        return this.metricFactory.createMetric(
+            'RunningTaskCount',
+            this.props.runningTasksMetricStatistic ?? MetricStatistic.AVERAGE,
+            'Running Tasks',
+            {
+                ServiceName: this.fargateServiceCore.serviceName,
+                ClusterName: this.fargateServiceCore.cluster.clusterName,
+            },
+            COLOR_NOT_SPECIFIED,
+            EcsContainerInsightsNamespace,
+        );
+    }
+
+    metricDiskUtilization(): Metric {
+        const ephemeralStorareReserved = this.metricFactory
+            .createMetric(
+                'EphemeralStorageReserved',
+                MetricStatistic.SUM,
+                'Ephemeral GiB Reserved',
+                {
+                    ClusterName: this.fargateServiceCore.cluster.clusterName,
+                    ServiceName: this.fargateServiceCore.serviceName,
+                },
+                COLOR_NOT_SPECIFIED,
+                EcsContainerInsightsNamespace,
+                this.props.diskUtilizationMetricOptions?.period ?? DEFAULT_METRIC_PERIOD,
+            );
+        const ephemeralStorageUtilized = this.metricFactory
+            .createMetric(
+                'EphemeralStorageUtilized',
+                MetricStatistic.SUM,
+                'Ephemeral GiB Utilized',
+                {
+                    ClusterName: this.fargateServiceCore.cluster.clusterName,
+                    ServiceName: this.fargateServiceCore.serviceName,
+                },
+                COLOR_NOT_SPECIFIED,
+                EcsContainerInsightsNamespace,
+                this.props.diskUtilizationMetricOptions?.period ?? DEFAULT_METRIC_PERIOD,
+            );
+
+        return this.metricFactory.createMetricMath(
+            'storageUtilized * 100 / storageReserved',
+            {
+                storageReserved: ephemeralStorareReserved,
+                storageUtilized: ephemeralStorageUtilized,
+            },
+            'DiskSpaceUtilization',
+            COLOR_NOT_SPECIFIED,
+            this.props.diskUtilizationMetricOptions?.period ?? DEFAULT_METRIC_PERIOD,
+        );
+    }
+
+    // JSII forbids 'get*' method names because they conflict with Java autogenerated code
+    provideFargateServiceCore(): FargateService {
+        return this.fargateServiceCore;
+    }
+}
